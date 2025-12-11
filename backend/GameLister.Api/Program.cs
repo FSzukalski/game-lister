@@ -32,4 +32,11 @@ if (app.Environment.IsDevelopment())
 app.UseHttpsRedirection();
 app.UseAuthorization();
 app.MapControllers();
+app.MapGet("/", () =>
+    Results.Json(new
+    {
+        status = "ok",
+        message = "GameLister API is running",
+        version = "1.0"
+    }));
 app.Run();

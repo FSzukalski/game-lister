@@ -17,12 +17,7 @@ builder.Services.AddDbContext<GameListerDbContext>(options =>
 
 var app = builder.Build();
 
-// automatyczne utworzenie bazy (bez migracji, na start wystarczy)
-using (var scope = app.Services.CreateScope())
-{
-    var db = scope.ServiceProvider.GetRequiredService<GameListerDbContext>();
-    db.Database.EnsureCreated();
-}
+
 
 if (app.Environment.IsDevelopment())
 {

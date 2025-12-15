@@ -2,50 +2,31 @@
 
 namespace GameLister.Api.Models.Allegro;
 
-// To jest “esencja” payloadu, który wyślesz do /sale/product-offers
 public class AllegroOfferData
 {
-    // Część produktowa
-    public AllegroProductData Product { get; set; } = new();
+    // Podstawowe
+    public string Title { get; set; } = default!;
+    public string DescriptionHtml { get; set; } = default!;
+    public string CategoryId { get; set; } = default!;
+    public string Language { get; set; } = "pl-PL";
 
-    // Część ofertowa
-    public AllegroSellingMode SellingMode { get; set; } = new();
-    public List<string> Images { get; set; } = new();          // URL-e zdjęć
-    public AllegroContact Contact { get; set; } = new();
-    public AllegroLocation? Location { get; set; }
-}
-
-public class AllegroProductData
-{
-    public string? ProductId { get; set; }                     // jeśli użyjesz katalogu Allegro
-    public string? Name { get; set; }                          // tytuł
-    public string? CategoryId { get; set; }                    // np. id kategorii gier
-    public List<AllegroParameter> Parameters { get; set; } = new();
-}
-
-public class AllegroSellingMode
-{
-    public string Format { get; set; } = "ADVERTISEMENT";      // zgodnie z dokumentacją
+    // Cena – używamy naszego ValueObject
     public Money Price { get; set; } = new();
-}
 
-public class AllegroContact
-{
-    public string Name { get; set; } = string.Empty;           // np. nazwa profilu sprzedawcy
-    public string? PhoneNumber { get; set; }
-    public string? Email { get; set; }
-}
+    // Stan / kompletność – uproszczone na razie
+    public string Condition { get; set; } = "USED";
+    public bool IsBoxIncluded { get; set; }
+    public bool IsManualIncluded { get; set; }
+    public bool IsOriginal { get; set; }
 
-public class AllegroLocation
-{
-    public string? City { get; set; }
-    public string? PostCode { get; set; }
-    public string? CountryCode { get; set; } = "PL";
-}
+    // Obrazy – na razie tylko URL-e, później połączymy z video/AI
+    public List<string> ImageUrls { get; set; } = [];
 
-public class AllegroParameter
-{
-    public string Id { get; set; } = string.Empty;             // np. "11323" dla parametru "Stan"
-    public List<string>? Values { get; set; }                  // wartości tekstowe
-    public List<string>? ValuesIds { get; set; }               // słownikowe id, np. "11323_1" -> "Nowy"
+    // Lokalizacja sprzedawcy – na razie stała / konfigurowalna
+    public string LocationCountryCode { get; set; } = "PL";
+    public string LocationProvince { get; set; } = "pomorskie";
+    public string LocationCity { get; set; } = "Gdańsk";
+
+    // Prosty model dostawy – pole do dalszej rozbudowy
+    public string? ShippingPolicyId { get; set; }
 }

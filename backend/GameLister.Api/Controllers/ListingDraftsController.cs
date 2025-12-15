@@ -1,7 +1,6 @@
 ﻿using GameLister.Api.Data;
 using GameLister.Api.Dtos;
 using GameLister.Api.Models;
-using GameLister.Api.Models.ValueObjects;
 using GameLister.Api.Services;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
@@ -12,174 +11,197 @@ namespace GameLister.Api.Controllers;
 [Route("api/[controller]")]
 public class ListingDraftsController : ControllerBase
 {
-    private readonly GameListerDbContext _context;
-    private readonly IListingPreviewService _previewService;
-    public ListingDraftsController(GameListerDbContext context, IListingPreviewService previewService)
+    private readonly GameListerDbContext _db;
+    private readonly IListingPreviewService _listingPreviewService;
+    private readonly IAllegroOfferPayloadService _allegroOfferPayloadService;
+
+    public ListingDraftsController(
+        GameListerDbContext db,
+        IListingPreviewService listingPreviewService,
+        IAllegroOfferPayloadService allegroOfferPayloadService)
     {
-        _context = context;
-        _previewService = previewService;
+        _db = db;
+        _listingPreviewService = listingPreviewService;
+        _allegroOfferPayloadService = allegroOfferPayloadService;
     }
 
-    // GET: /api/ListingDrafts?gameId=1
+    // GET: api/ListingDrafts
     [HttpGet]
-    public async Task<ActionResult<IEnumerable<ListingDraftDto>>> GetAll([FromQuery] int? gameId)
+    public async Task<ActionResult<IEnumerable<ListingDraftDto>>> GetAll(CancellationToken cancellationToken)
     {
-        var query = _context.ListingDrafts.AsQueryable();
+        var drafts = await _db.ListingDrafts
+            .AsNoTracking()
+            .ToListAsync(cancellationToken);
 
-        if (gameId.HasValue)
-        {
-            query = query.Where(ld => ld.GameId == gameId.Value);
-        }
+        var dtos = drafts.Select(d => new ListingDraftDto(
+            Id: d.Id,
+            GameId: d.GameId,
+            Marketplace: d.Marketplace,
+            Title: d.Title,
+            Subtitle: d.Subtitle,
+            DescriptionHtml: d.DescriptionHtml,
+            CategoryId: d.CategoryId,
+            Language: d.Language,
+            Status: d.Status,
+            Price: new MoneyDto(d.Price.Amount, d.Price.Currency),
+            CreatedAt: d.CreatedAt,
+            UpdatedAt: d.UpdatedAt
+        ));
 
-        var drafts = await query
-            .OrderByDescending(ld => ld.CreatedAt)
-            .ToListAsync();
-
-        return drafts.Select(ToDto).ToList();
+        return Ok(dtos);
     }
 
-    // GET: /api/ListingDrafts/5
+    // GET: api/ListingDrafts/5
     [HttpGet("{id:int}")]
-    public async Task<ActionResult<ListingDraftDto>> GetById(int id)
+    public async Task<ActionResult<ListingDraftDto>> GetById(int id, CancellationToken cancellationToken)
     {
-        var d = await _context.ListingDrafts.FindAsync(id);
-        if (d is null) return NotFound();
+        var d = await _db.ListingDrafts.FindAsync(new object[] { id }, cancellationToken);
+        if (d is null)
+            return NotFound();
 
-        return ToDto(d);
+        var dto = new ListingDraftDto(
+            Id: d.Id,
+            GameId: d.GameId,
+            Marketplace: d.Marketplace,
+            Title: d.Title,
+            Subtitle: d.Subtitle,
+            DescriptionHtml: d.DescriptionHtml,
+            CategoryId: d.CategoryId,
+            Language: d.Language,
+            Status: d.Status,
+            Price: new MoneyDto(d.Price.Amount, d.Price.Currency),
+            CreatedAt: d.CreatedAt,
+            UpdatedAt: d.UpdatedAt
+        );
+
+        return Ok(dto);
     }
 
-    // POST: /api/ListingDrafts
+    // POST: api/ListingDrafts
     [HttpPost]
-    public async Task<ActionResult<ListingDraftDto>> Create(ListingDraftUpsertDto request)
+    public async Task<ActionResult<ListingDraftDto>> Create(
+        ListingDraftUpsertDto dto,
+        CancellationToken cancellationToken)
     {
-        // Sprawdzamy, czy istnieje powiązana gra
-        var game = await _context.Games.FindAsync(request.GameId);
-        if (game is null)
-        {
-            return BadRequest($"Game with id {request.GameId} not found.");
-        }
-
-        var now = DateTime.UtcNow;
-
         var draft = new ListingDraft
         {
-            GameId = request.GameId,
-            Marketplace = request.Marketplace,
-            Title = request.Title,
-            Subtitle = request.Subtitle,
-            DescriptionHtml = request.DescriptionHtml,
-            CategoryId = request.CategoryId,
-            Language = request.Language,
-            Status = request.Status,
-            Price = new Money
+            GameId = dto.GameId,
+            Marketplace = dto.Marketplace,
+            Title = dto.Title,
+            Subtitle = dto.Subtitle,
+            DescriptionHtml = dto.DescriptionHtml,
+            CategoryId = dto.CategoryId,
+            Language = dto.Language,
+            Status = dto.Status,
+            Price = new GameLister.Api.Models.ValueObjects.Money
             {
-                Amount = request.Price.Amount,
-                Currency = request.Price.Currency
+                Amount = dto.Price.Amount,
+                Currency = dto.Price.Currency
             },
-            CreatedAt = now,
-            UpdatedAt = now
+            CreatedAt = DateTime.UtcNow
         };
 
-        _context.ListingDrafts.Add(draft);
-        await _context.SaveChangesAsync();
+        _db.ListingDrafts.Add(draft);
+        await _db.SaveChangesAsync(cancellationToken);
 
-        var dto = ToDto(draft);
-
-        return CreatedAtAction(
-            nameof(GetById),
-            new { id = draft.Id },
-            dto
+        var result = new ListingDraftDto(
+            Id: draft.Id,
+            GameId: draft.GameId,
+            Marketplace: draft.Marketplace,
+            Title: draft.Title,
+            Subtitle: draft.Subtitle,
+            DescriptionHtml: draft.DescriptionHtml,
+            CategoryId: draft.CategoryId,
+            Language: draft.Language,
+            Status: draft.Status,
+            Price: new MoneyDto(draft.Price.Amount, draft.Price.Currency),
+            CreatedAt: draft.CreatedAt,
+            UpdatedAt: draft.UpdatedAt
         );
+
+        return CreatedAtAction(nameof(GetById), new { id = draft.Id }, result);
     }
 
-    // PUT: /api/ListingDrafts/5
+    // PUT: api/ListingDrafts/5
     [HttpPut("{id:int}")]
-    public async Task<ActionResult<ListingDraftDto>> Update(int id, ListingDraftUpsertDto request)
+    public async Task<ActionResult<ListingDraftDto>> Update(
+        int id,
+        ListingDraftUpsertDto dto,
+        CancellationToken cancellationToken)
     {
-        var draft = await _context.ListingDrafts.FindAsync(id);
-        if (draft is null) return NotFound();
+        var draft = await _db.ListingDrafts.FindAsync(new object[] { id }, cancellationToken);
+        if (draft is null)
+            return NotFound();
 
-        // (opcjonalnie) możesz wymusić, że GameId nie zmieniamy
-        if (draft.GameId != request.GameId)
-        {
-            // Możesz wybrać: albo blokujesz zmianę, albo ją dopuszczasz.
-            // Ja dla prostoty dopuszczam zmianę:
-            var game = await _context.Games.FindAsync(request.GameId);
-            if (game is null)
-            {
-                return BadRequest($"Game with id {request.GameId} not found.");
-            }
-
-            draft.GameId = request.GameId;
-        }
-
-        draft.Marketplace = request.Marketplace;
-        draft.Title = request.Title;
-        draft.Subtitle = request.Subtitle;
-        draft.DescriptionHtml = request.DescriptionHtml;
-        draft.CategoryId = request.CategoryId;
-        draft.Language = request.Language;
-        draft.Status = request.Status;
-        draft.Price = new Money
-        {
-            Amount = request.Price.Amount,
-            Currency = request.Price.Currency
-        };
+        draft.GameId = dto.GameId;
+        draft.Marketplace = dto.Marketplace;
+        draft.Title = dto.Title;
+        draft.Subtitle = dto.Subtitle;
+        draft.DescriptionHtml = dto.DescriptionHtml;
+        draft.CategoryId = dto.CategoryId;
+        draft.Language = dto.Language;
+        draft.Status = dto.Status;
+        draft.Price.Amount = dto.Price.Amount;
+        draft.Price.Currency = dto.Price.Currency;
         draft.UpdatedAt = DateTime.UtcNow;
 
-        await _context.SaveChangesAsync();
+        await _db.SaveChangesAsync(cancellationToken);
 
-        return ToDto(draft);
+        var result = new ListingDraftDto(
+            Id: draft.Id,
+            GameId: draft.GameId,
+            Marketplace: draft.Marketplace,
+            Title: draft.Title,
+            Subtitle: draft.Subtitle,
+            DescriptionHtml: draft.DescriptionHtml,
+            CategoryId: draft.CategoryId,
+            Language: draft.Language,
+            Status: draft.Status,
+            Price: new MoneyDto(draft.Price.Amount, draft.Price.Currency),
+            CreatedAt: draft.CreatedAt,
+            UpdatedAt: draft.UpdatedAt
+        );
+
+        return Ok(result);
     }
 
-    // DELETE: /api/ListingDrafts/5
+    // DELETE: api/ListingDrafts/5
     [HttpDelete("{id:int}")]
-    public async Task<IActionResult> Delete(int id)
+    public async Task<IActionResult> Delete(int id, CancellationToken cancellationToken)
     {
-        var draft = await _context.ListingDrafts.FindAsync(id);
-        if (draft is null) return NotFound();
+        var draft = await _db.ListingDrafts.FindAsync(new object[] { id }, cancellationToken);
+        if (draft is null)
+            return NotFound();
 
-        _context.ListingDrafts.Remove(draft);
-        await _context.SaveChangesAsync();
+        _db.ListingDrafts.Remove(draft);
+        await _db.SaveChangesAsync(cancellationToken);
 
         return NoContent();
     }
 
-    // GET: /api/ListingDrafts/{id}/preview
+    // GET: api/ListingDrafts/5/preview
     [HttpGet("{id:int}/preview")]
-    public async Task<ActionResult<ListingPreviewDto>> GetPreview(int id)
+    public async Task<ActionResult<ListingPreviewDto>> GetPreview(
+        int id,
+        CancellationToken cancellationToken)
     {
-        var draft = await _context
-            .ListingDrafts
-            .Include(ld => ld.Game)
-            .FirstOrDefaultAsync(ld => ld.Id == id);
-
-        if (draft is null)
+        var preview = await _listingPreviewService.GetPreviewAsync(id, cancellationToken);
+        if (preview is null)
             return NotFound();
 
-        var preview = _previewService.GeneratePreview(draft, draft.Game);
-        return preview;
+        return Ok(preview);
     }
 
+    // GET: api/ListingDrafts/5/allegro-payload
+    [HttpGet("{id:int}/allegro-payload")]
+    public async Task<ActionResult<object>> GetAllegroPayload(
+        int id,
+        CancellationToken cancellationToken)
+    {
+        var payload = await _allegroOfferPayloadService.BuildAllegroOfferPayloadAsync(id, cancellationToken);
+        if (payload is null)
+            return NotFound();
 
-
-
-
-    // ------- mapowanie Entity -> DTO -------
-
-    private static ListingDraftDto ToDto(ListingDraft d)
-        => new(
-            d.Id,
-            d.GameId,
-            d.Marketplace,
-            d.Title,
-            d.Subtitle,
-            d.DescriptionHtml,
-            d.CategoryId,
-            d.Language,
-            d.Status,
-            new MoneyDto(d.Price.Amount, d.Price.Currency),
-            d.CreatedAt,
-            d.UpdatedAt
-        );
+        return Ok(payload);
+    }
 }

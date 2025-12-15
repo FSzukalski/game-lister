@@ -1,151 +1,96 @@
 ﻿using System.Text;
+using GameLister.Api.Data;
 using GameLister.Api.Dtos;
-using GameLister.Api.Models;
-using GameLister.Api.Models.ValueObjects;
+using Microsoft.EntityFrameworkCore;
 
 namespace GameLister.Api.Services;
 
-public interface IListingPreviewService
-{
-    ListingPreviewDto GeneratePreview(ListingDraft listing, Game game);
-}
-
 public class ListingPreviewService : IListingPreviewService
 {
-    public ListingPreviewDto GeneratePreview(ListingDraft listing, Game game)
+    private readonly GameListerDbContext _db;
+
+    public ListingPreviewService(GameListerDbContext db)
     {
-        var now = DateTime.UtcNow;
+        _db = db;
+    }
 
-        // 1. Tytuł aukcji
-        var title = string.IsNullOrWhiteSpace(listing.Title)
-            ? BuildTitleFromGame(game)
-            : listing.Title;
+    public async Task<ListingPreviewDto?> GetPreviewAsync(
+        int listingDraftId,
+        CancellationToken cancellationToken = default)
+    {
+        var draft = await _db.ListingDrafts
+            .Include(ld => ld.Game)
+            .FirstOrDefaultAsync(ld => ld.Id == listingDraftId, cancellationToken);
 
-        // 2. Podtytuł
-        var subtitle = listing.Subtitle;
-        if (string.IsNullOrWhiteSpace(subtitle))
-        {
-            subtitle = BuildDefaultSubtitle(game);
-        }
+        if (draft is null || draft.Game is null)
+            return null;
 
-        // 3. Opis HTML – jeśli użytkownik już coś wpisał, to nie nadpisujemy,
-        // tylko ewentualnie delikatnie wzbogacamy.
-        var descriptionHtml = string.IsNullOrWhiteSpace(listing.DescriptionHtml)
-            ? BuildDescriptionFromGame(listing, game)
-            : listing.DescriptionHtml;
-
-        // 4. Cena
-        var priceDto = new MoneyDto(listing.Price.Amount, listing.Price.Currency);
+        var descriptionHtml = BuildHtmlDescription(draft.Game, draft);
 
         return new ListingPreviewDto(
-            ListingDraftId: listing.Id,
-            GameId: listing.GameId,
-            Marketplace: listing.Marketplace,
-            Title: title,
-            Subtitle: subtitle,
+            ListingDraftId: draft.Id,
+            GameId: draft.GameId,
+            Marketplace: draft.Marketplace,
+            Title: draft.Title,
+            Subtitle: draft.Subtitle,
             DescriptionHtml: descriptionHtml,
-            Price: priceDto,
-            GeneratedAtUtc: now
+            Price: new MoneyDto(draft.Price.Amount, draft.Price.Currency),
+            GeneratedAtUtc: DateTime.UtcNow
         );
     }
 
-    private static string BuildTitleFromGame(Game game)
-    {
-        var parts = new List<string>();
-
-        if (!string.IsNullOrWhiteSpace(game.Title))
-            parts.Add(game.Title);
-
-        if (!string.IsNullOrWhiteSpace(game.Platform))
-            parts.Add($"({game.Platform})");
-
-        if (!string.IsNullOrWhiteSpace(game.Edition))
-            parts.Add(game.Edition);
-
-        if (!string.IsNullOrWhiteSpace(game.Condition))
-            parts.Add($"- {game.Condition}");
-
-        return string.Join(" ", parts.Where(p => !string.IsNullOrWhiteSpace(p)));
-    }
-
-    private static string BuildDefaultSubtitle(Game game)
-    {
-        var parts = new List<string>();
-
-        if (!string.IsNullOrWhiteSpace(game.Region))
-            parts.Add(game.Region);
-
-        if (!string.IsNullOrWhiteSpace(game.Language))
-            parts.Add($"wersja {game.Language}");
-
-        if (!string.IsNullOrWhiteSpace(game.Condition))
-            parts.Add($"stan: {game.Condition}");
-
-        var result = string.Join(", ", parts.Where(p => !string.IsNullOrWhiteSpace(p)));
-        return string.IsNullOrWhiteSpace(result) ? "Aukcja gry" : result;
-    }
-
-    private static string BuildDescriptionFromGame(ListingDraft listing, Game game)
+    private static string BuildHtmlDescription(Models.Game game, Models.ListingDraft draft)
     {
         var sb = new StringBuilder();
 
-        sb.AppendLine("<h2>Szczegóły gry</h2>");
-        sb.Append("<p>");
-
-        sb.Append(Escape(game.Title));
+        sb.Append("<p><strong>")
+          .Append(System.Net.WebUtility.HtmlEncode(game.Title));
 
         if (!string.IsNullOrWhiteSpace(game.Platform))
-            sb.Append($" na <strong>{Escape(game.Platform)}</strong>");
-
-        if (!string.IsNullOrWhiteSpace(game.Edition))
-            sb.Append($", edycja: {Escape(game.Edition)}");
-
-        sb.AppendLine(".</p>");
-
-        // Główne cechy
-        sb.AppendLine("<h3>Stan i kompletność</h3>");
-        sb.AppendLine("<ul>");
-
-        if (!string.IsNullOrWhiteSpace(game.Condition))
-            sb.AppendLine($"  <li>Stan: {Escape(game.Condition)}</li>");
-
-        sb.AppendLine($"  <li>Oryginał: {(game.IsOriginal ? "tak" : "nie / niepewne")}</li>");
-        sb.AppendLine($"  <li>Pudełko: {(game.IsBoxIncluded ? "w zestawie" : "brak")}</li>");
-        sb.AppendLine($"  <li>Instrukcja: {(game.IsManualIncluded ? "w zestawie" : "brak")}</li>");
-
-        if (!string.IsNullOrWhiteSpace(game.Language))
-            sb.AppendLine($"  <li>Język: {Escape(game.Language)}</li>");
-
-        if (!string.IsNullOrWhiteSpace(game.Region))
-            sb.AppendLine($"  <li>Region: {Escape(game.Region)}</li>");
-
-        sb.AppendLine("</ul>");
-
-        // Opis użytkownika gry
-        if (!string.IsNullOrWhiteSpace(game.Description))
         {
-            sb.AppendLine("<h3>Dodatkowy opis</h3>");
-            sb.AppendLine($"<p>{Escape(game.Description)}</p>");
+            sb.Append(" (")
+              .Append(System.Net.WebUtility.HtmlEncode(game.Platform))
+              .Append(')');
         }
 
-        // Info o cenie
-        sb.AppendLine("<h3>Cena</h3>");
-        sb.AppendLine($"<p>Cena wywoławcza: <strong>{listing.Price.Amount:0.00} {Escape(listing.Price.Currency)}</strong>.</p>");
+        sb.Append("</strong></p>");
 
-        // Subtelna stopka o szkicu
-        sb.AppendLine("<hr/>");
-        sb.AppendLine("<p style=\"font-size: 0.9em; color: #666;\">Ten opis został wygenerowany automatycznie na podstawie danych o grze. Przed wystawieniem aukcji możesz go dowolnie edytować.</p>");
+        if (!string.IsNullOrWhiteSpace(draft.DescriptionHtml))
+        {
+            sb.Append(draft.DescriptionHtml);
+        }
+        else if (!string.IsNullOrWhiteSpace(game.Description))
+        {
+            sb.Append("<p>")
+              .Append(System.Net.WebUtility.HtmlEncode(game.Description))
+              .Append("</p>");
+        }
+
+        sb.Append("<ul>");
+
+        if (!string.IsNullOrWhiteSpace(game.Condition))
+        {
+            sb.Append("<li>Stan: ")
+              .Append(System.Net.WebUtility.HtmlEncode(game.Condition))
+              .Append("</li>");
+        }
+
+        if (!string.IsNullOrWhiteSpace(game.Language))
+        {
+            sb.Append("<li>Język: ")
+              .Append(System.Net.WebUtility.HtmlEncode(game.Language))
+              .Append("</li>");
+        }
+
+        if (!string.IsNullOrWhiteSpace(game.Region))
+        {
+            sb.Append("<li>Region: ")
+              .Append(System.Net.WebUtility.HtmlEncode(game.Region))
+              .Append("</li>");
+        }
+
+        sb.Append("</ul>");
 
         return sb.ToString();
-    }
-
-    private static string Escape(string? input)
-    {
-        if (string.IsNullOrEmpty(input)) return string.Empty;
-
-        return input
-            .Replace("&", "&amp;")
-            .Replace("<", "&lt;")
-            .Replace(">", "&gt;");
     }
 }

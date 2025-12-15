@@ -1,6 +1,4 @@
-﻿using GameLister.Api.Models.ValueObjects;
-
-namespace GameLister.Api.Dtos;
+﻿namespace GameLister.Api.Dtos;
 
 public record MoneyDto(decimal Amount, string Currency);
 

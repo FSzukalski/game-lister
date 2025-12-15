@@ -2,6 +2,7 @@
 using GameLister.Api.Dtos;
 using GameLister.Api.Models;
 using GameLister.Api.Models.ValueObjects;
+using GameLister.Api.Services;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 
@@ -12,10 +13,11 @@ namespace GameLister.Api.Controllers;
 public class ListingDraftsController : ControllerBase
 {
     private readonly GameListerDbContext _context;
-
-    public ListingDraftsController(GameListerDbContext context)
+    private readonly IListingPreviewService _previewService;
+    public ListingDraftsController(GameListerDbContext context, IListingPreviewService previewService)
     {
         _context = context;
+        _previewService = previewService;
     }
 
     // GET: /api/ListingDrafts?gameId=1
@@ -142,6 +144,26 @@ public class ListingDraftsController : ControllerBase
 
         return NoContent();
     }
+
+    // GET: /api/ListingDrafts/{id}/preview
+    [HttpGet("{id:int}/preview")]
+    public async Task<ActionResult<ListingPreviewDto>> GetPreview(int id)
+    {
+        var draft = await _context
+            .ListingDrafts
+            .Include(ld => ld.Game)
+            .FirstOrDefaultAsync(ld => ld.Id == id);
+
+        if (draft is null)
+            return NotFound();
+
+        var preview = _previewService.GeneratePreview(draft, draft.Game);
+        return preview;
+    }
+
+
+
+
 
     // ------- mapowanie Entity -> DTO -------
 

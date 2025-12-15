@@ -1,8 +1,10 @@
 using GameLister.Api.Data;
+using GameLister.Api.Services;
 using Microsoft.EntityFrameworkCore;
 
 var builder = WebApplication.CreateBuilder(args);
 
+builder.Services.AddScoped<IListingPreviewService, ListingPreviewService>();
 builder.Services.AddControllers();
 builder.Services.AddEndpointsApiExplorer();
 builder.Services.AddOpenApi(); // wbudowane OpenAPI z .NET 9

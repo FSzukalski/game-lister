@@ -32,4 +32,9 @@ public class Game
 
     // Relacja do zdjęć
     public List<GameImage> Images { get; set; } = new();
+
+    // Relacja do stworzonych aukcji
+
+    public ICollection<ListingDraft> ListingDrafts { get; set; } = new List<ListingDraft>();
+
 }

@@ -194,13 +194,16 @@ public class ListingDraftsController : ControllerBase
 
     // GET: api/ListingDrafts/5/allegro-payload
     [HttpGet("{id:int}/allegro-payload")]
-    public async Task<ActionResult<object>> GetAllegroPayload(
-        int id,
-        CancellationToken cancellationToken)
+    public async Task<ActionResult<AllegroOfferPayloadDto>> GetAllegroPayload(
+    int id,
+    CancellationToken cancellationToken)
     {
         var payload = await _allegroOfferPayloadService.BuildAllegroOfferPayloadAsync(id, cancellationToken);
+
         if (payload is null)
+        {
             return NotFound();
+        }
 
         return Ok(payload);
     }

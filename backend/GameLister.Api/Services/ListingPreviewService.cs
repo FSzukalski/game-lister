@@ -1,9 +1,20 @@
-﻿using System.Text;
+﻿using System;
+using System.Collections.Generic;
+using System.Linq;
+using System.Text;
+using System.Threading;
+using System.Threading.Tasks;
 using GameLister.Api.Data;
 using GameLister.Api.Dtos;
+using GameLister.Api.Models;
 using Microsoft.EntityFrameworkCore;
 
 namespace GameLister.Api.Services;
+
+public interface IListingPreviewService
+{
+    Task<ListingPreviewDto?> GetPreviewAsync(int listingDraftId, CancellationToken cancellationToken = default);
+}
 
 public class ListingPreviewService : IListingPreviewService
 {
@@ -18,79 +29,107 @@ public class ListingPreviewService : IListingPreviewService
         int listingDraftId,
         CancellationToken cancellationToken = default)
     {
-        var draft = await _db.ListingDrafts
+        var listingDraft = await _db.ListingDrafts
+            .AsNoTracking()
             .Include(ld => ld.Game)
             .FirstOrDefaultAsync(ld => ld.Id == listingDraftId, cancellationToken);
 
-        if (draft is null || draft.Game is null)
+        if (listingDraft is null)
+        {
             return null;
+        }
 
-        var descriptionHtml = BuildHtmlDescription(draft.Game, draft);
+        var game = listingDraft.Game;
 
-        return new ListingPreviewDto(
-            ListingDraftId: draft.Id,
-            GameId: draft.GameId,
-            Marketplace: draft.Marketplace,
-            Title: draft.Title,
-            Subtitle: draft.Subtitle,
-            DescriptionHtml: descriptionHtml,
-            Price: new MoneyDto(draft.Price.Amount, draft.Price.Currency),
-            GeneratedAtUtc: DateTime.UtcNow
-        );
-    }
-
-    private static string BuildHtmlDescription(Models.Game game, Models.ListingDraft draft)
-    {
+        // --- opis HTML – bazowy, potem do rozbudowy ---
         var sb = new StringBuilder();
 
-        sb.Append("<p><strong>")
-          .Append(System.Net.WebUtility.HtmlEncode(game.Title));
+        sb.Append("<p>Sprzedam <strong>")
+          .Append(game.Title);
 
         if (!string.IsNullOrWhiteSpace(game.Platform))
         {
-            sb.Append(" (")
-              .Append(System.Net.WebUtility.HtmlEncode(game.Platform))
-              .Append(')');
+            sb.Append("</strong> na <strong>")
+              .Append(game.Platform);
         }
 
-        sb.Append("</strong></p>");
+        sb.Append("</strong>.</p>");
 
-        if (!string.IsNullOrWhiteSpace(draft.DescriptionHtml))
+        // priorytet: custom opis z draftu, potem opis z Game
+        if (!string.IsNullOrWhiteSpace(listingDraft.DescriptionHtml))
         {
-            sb.Append(draft.DescriptionHtml);
+            sb.Append(listingDraft.DescriptionHtml);
         }
         else if (!string.IsNullOrWhiteSpace(game.Description))
         {
             sb.Append("<p>")
-              .Append(System.Net.WebUtility.HtmlEncode(game.Description))
+              .Append(game.Description)
               .Append("</p>");
         }
 
-        sb.Append("<ul>");
+        // dodatkowe info (stan, kompletność)
+        var details = new List<string>();
 
         if (!string.IsNullOrWhiteSpace(game.Condition))
         {
-            sb.Append("<li>Stan: ")
-              .Append(System.Net.WebUtility.HtmlEncode(game.Condition))
-              .Append("</li>");
+            details.Add($"Stan: {game.Condition}");
         }
 
-        if (!string.IsNullOrWhiteSpace(game.Language))
+        if (game.IsBoxIncluded)
         {
-            sb.Append("<li>Język: ")
-              .Append(System.Net.WebUtility.HtmlEncode(game.Language))
-              .Append("</li>");
+            details.Add("W zestawie: pudełko");
         }
 
-        if (!string.IsNullOrWhiteSpace(game.Region))
+        if (game.IsManualIncluded)
         {
-            sb.Append("<li>Region: ")
-              .Append(System.Net.WebUtility.HtmlEncode(game.Region))
-              .Append("</li>");
+            details.Add("W zestawie: instrukcja");
         }
 
-        sb.Append("</ul>");
+        if (details.Count > 0)
+        {
+            sb.Append("<ul>");
+            foreach (var d in details)
+            {
+                sb.Append("<li>")
+                  .Append(d)
+                  .Append("</li>");
+            }
+            sb.Append("</ul>");
+        }
 
-        return sb.ToString();
+        var descriptionHtml = sb.ToString();
+
+        // --- zdjęcia gry ---
+        var images = await _db.GameImages
+            .AsNoTracking()
+            .Where(i => i.GameId == game.Id)
+            .OrderByDescending(i => i.IsPrimary)
+            .ThenBy(i => i.SortOrder)
+            .ThenBy(i => i.Id)
+            .ToListAsync(cancellationToken);
+
+        var imageDtos = images
+            .Select(i => new GameImageDto(
+                i.Id,
+                       i.Url,
+                i.Type.ToString(),
+                i.SortOrder,
+                i.IsPrimary))
+            .ToList()
+            .AsReadOnly();
+
+        var priceDto = new MoneyDto(listingDraft.Price.Amount, listingDraft.Price.Currency);
+
+        return new ListingPreviewDto(
+            listingDraft.Id,
+            listingDraft.GameId,
+            listingDraft.Marketplace,
+            listingDraft.Title,
+            listingDraft.Subtitle,
+            descriptionHtml,
+            priceDto,
+            DateTime.UtcNow,
+            imageDtos
+        );
     }
 }

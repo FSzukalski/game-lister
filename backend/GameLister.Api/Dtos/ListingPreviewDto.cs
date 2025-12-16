@@ -1,5 +1,7 @@
-﻿namespace GameLister.Api.Dtos;
+﻿using System;
+using System.Collections.Generic;
 
+namespace GameLister.Api.Dtos;
 
 public record ListingPreviewDto(
     int ListingDraftId,
@@ -9,5 +11,6 @@ public record ListingPreviewDto(
     string? Subtitle,
     string DescriptionHtml,
     MoneyDto Price,
-    DateTime GeneratedAtUtc
+    DateTime GeneratedAtUtc,
+    IReadOnlyList<GameImageDto> Images
 );

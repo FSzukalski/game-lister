@@ -12,7 +12,7 @@ public class GameListerDbContext : DbContext
 
     public DbSet<Game> Games => Set<Game>();
     public DbSet<ListingDraft> ListingDrafts => Set<ListingDraft>();
-
+    public DbSet<GameImage> GameImages => Set<GameImage>();
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
         base.OnModelCreating(modelBuilder);
@@ -60,7 +60,16 @@ public class GameListerDbContext : DbContext
                   .WithOne(ld => ld.Game)
                   .HasForeignKey(ld => ld.GameId)
                   .OnDelete(DeleteBehavior.Cascade);
+
+            // NOWA relacja: 1 Game -> wiele GameImage
+            entity.HasMany(g => g.Images)
+                  .WithOne(i => i.Game)
+                  .HasForeignKey(i => i.GameId)
+                  .OnDelete(DeleteBehavior.Cascade);
+
         });
+
+
 
         // ------- ListingDraft -------
         modelBuilder.Entity<ListingDraft>(entity =>
@@ -100,6 +109,28 @@ public class GameListerDbContext : DbContext
                      .HasColumnName("Price_Currency")
                      .HasMaxLength(3);
             });
+        });
+
+        // ------- GameImage -------
+        modelBuilder.Entity<GameImage>(entity =>
+        {
+            entity.HasKey(i => i.Id);
+
+            entity.Property(i => i.Url)
+                  .IsRequired()
+                  .HasMaxLength(500);
+
+            entity.Property(i => i.Type)
+                  .HasConversion<int>();
+
+            entity.Property(i => i.SortOrder)
+                  .HasDefaultValue(0);
+
+            entity.Property(i => i.IsPrimary)
+                  .HasDefaultValue(false);
+
+            entity.Property(i => i.CreatedAt)
+                  .IsRequired();
         });
     }
 }

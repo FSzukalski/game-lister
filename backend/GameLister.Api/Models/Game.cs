@@ -31,10 +31,9 @@ public class Game
     public DateTime? UpdatedAt { get; set; }
 
     // Relacja do zdjęć
-    public List<GameImage> Images { get; set; } = new();
+    public ICollection<GameImage> Images { get; set; } = new List<GameImage>();
 
     // Relacja do stworzonych aukcji
 
     public ICollection<ListingDraft> ListingDrafts { get; set; } = new List<ListingDraft>();
-
-}
+    }

@@ -4,6 +4,16 @@ using Microsoft.EntityFrameworkCore;
 
 var builder = WebApplication.CreateBuilder(args);
 
+// CORS – na czas dev pozwalamy na wszystko
+builder.Services.AddCors(options =>
+{
+    options.AddDefaultPolicy(policy =>
+        policy
+            .AllowAnyOrigin()
+            .AllowAnyHeader()
+            .AllowAnyMethod());
+});
+
 builder.Services.AddScoped<IListingPreviewService, ListingPreviewService>();
 builder.Services.AddScoped<IAllegroOfferPayloadService, AllegroOfferPayloadService>(); builder.Services.AddControllers();
 builder.Services.AddEndpointsApiExplorer();
@@ -27,7 +37,9 @@ if (app.Environment.IsDevelopment())
 }
 
 app.UseHttpsRedirection();
+app.UseCors();
 app.UseAuthorization();
+
 app.MapControllers();
 app.MapGet("/", () =>
     Results.Json(new

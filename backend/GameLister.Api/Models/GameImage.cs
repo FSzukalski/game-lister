@@ -44,4 +44,7 @@ public class GameImage
     public bool IsPrimary { get; set; } = false;
 
     public DateTime CreatedAt { get; set; } = DateTime.UtcNow;
+    public ICollection<ListingDraftImage> ListingDraftLinks { get; set; } = new List<ListingDraftImage>();
+    public ICollection<ListingDraftImage> ListingDraftImages { get; set; } = new List<ListingDraftImage>();
+
 }

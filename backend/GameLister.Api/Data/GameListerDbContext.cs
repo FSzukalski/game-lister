@@ -13,6 +13,8 @@ public class GameListerDbContext : DbContext
     public DbSet<Game> Games => Set<Game>();
     public DbSet<ListingDraft> ListingDrafts => Set<ListingDraft>();
     public DbSet<GameImage> GameImages => Set<GameImage>();
+    public DbSet<ListingDraftImage> ListingDraftImages => Set<ListingDraftImage>();
+
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
         base.OnModelCreating(modelBuilder);
@@ -26,25 +28,13 @@ public class GameListerDbContext : DbContext
                 .IsRequired()
                 .HasMaxLength(200);
 
-            entity.Property(g => g.Subtitle)
-                .HasMaxLength(200);
+            entity.Property(g => g.Subtitle).HasMaxLength(200);
+            entity.Property(g => g.Platform).HasMaxLength(100);
+            entity.Property(g => g.Edition).HasMaxLength(100);
+            entity.Property(g => g.Language).HasMaxLength(50);
+            entity.Property(g => g.Region).HasMaxLength(50);
+            entity.Property(g => g.Condition).HasMaxLength(50);
 
-            entity.Property(g => g.Platform)
-                .HasMaxLength(100);
-
-            entity.Property(g => g.Edition)
-                .HasMaxLength(100);
-
-            entity.Property(g => g.Language)
-                .HasMaxLength(50);
-
-            entity.Property(g => g.Region)
-                .HasMaxLength(50);
-
-            entity.Property(g => g.Condition)
-                .HasMaxLength(50);
-
-            // Money jako owned type – jawny typ kolumny
             entity.OwnsOne(g => g.Price, money =>
             {
                 money.Property(m => m.Amount)
@@ -61,43 +51,24 @@ public class GameListerDbContext : DbContext
                   .HasForeignKey(ld => ld.GameId)
                   .OnDelete(DeleteBehavior.Cascade);
 
-            // NOWA relacja: 1 Game -> wiele GameImage
             entity.HasMany(g => g.Images)
                   .WithOne(i => i.Game)
                   .HasForeignKey(i => i.GameId)
                   .OnDelete(DeleteBehavior.Cascade);
-
         });
-
-
 
         // ------- ListingDraft -------
         modelBuilder.Entity<ListingDraft>(entity =>
         {
             entity.HasKey(ld => ld.Id);
 
-            entity.Property(ld => ld.Marketplace)
-                  .IsRequired()
-                  .HasMaxLength(50);
+            entity.Property(ld => ld.Marketplace).IsRequired().HasMaxLength(50);
+            entity.Property(ld => ld.Title).IsRequired().HasMaxLength(200);
+            entity.Property(ld => ld.Subtitle).HasMaxLength(200);
 
-            entity.Property(ld => ld.Title)
-                  .IsRequired()
-                  .HasMaxLength(200);
-
-            entity.Property(ld => ld.Subtitle)
-                  .HasMaxLength(200);
-
-            entity.Property(ld => ld.CategoryId)
-                  .IsRequired()
-                  .HasMaxLength(100);
-
-            entity.Property(ld => ld.Language)
-                  .IsRequired()
-                  .HasMaxLength(10);
-
-            entity.Property(ld => ld.Status)
-                  .IsRequired()
-                  .HasMaxLength(30);
+            entity.Property(ld => ld.CategoryId).IsRequired().HasMaxLength(100);
+            entity.Property(ld => ld.Language).IsRequired().HasMaxLength(10);
+            entity.Property(ld => ld.Status).IsRequired().HasMaxLength(30);
 
             entity.OwnsOne(ld => ld.Price, money =>
             {
@@ -132,5 +103,29 @@ public class GameListerDbContext : DbContext
             entity.Property(i => i.CreatedAt)
                   .IsRequired();
         });
+
+        // ------- ListingDraftImage (join) -------
+        modelBuilder.Entity<ListingDraftImage>(entity =>
+        {
+            entity.HasKey(x => x.Id);
+
+            entity.Property(x => x.SortOrder).HasDefaultValue(0);
+            entity.Property(x => x.CreatedAt).IsRequired();
+
+            entity.HasOne(x => x.ListingDraft)
+                  .WithMany(ld => ld.Images)
+                  .HasForeignKey(x => x.ListingDraftId)
+                  .OnDelete(DeleteBehavior.Cascade);
+
+            entity.HasOne(x => x.GameImage)
+                  .WithMany(gi => gi.ListingDraftImages)   // <-- ważne (jeśli dodałeś kolekcję)
+                  .HasForeignKey(x => x.GameImageId)
+                  .OnDelete(DeleteBehavior.Cascade)
+                  .IsRequired();
+
+            entity.HasIndex(x => new { x.ListingDraftId, x.GameImageId })
+                  .IsUnique();
+        });
+
     }
 }

@@ -3,6 +3,7 @@ using System;
 using GameLister.Api.Data;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
+using Microsoft.EntityFrameworkCore.Migrations;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 
 #nullable disable
@@ -10,9 +11,11 @@ using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 namespace GameLister.Api.Migrations
 {
     [DbContext(typeof(GameListerDbContext))]
-    partial class GameListerDbContextModelSnapshot : ModelSnapshot
+    [Migration("20251226235030_CleanupListingDraftImageNavigation")]
+    partial class CleanupListingDraftImageNavigation
     {
-        protected override void BuildModel(ModelBuilder modelBuilder)
+        /// <inheritdoc />
+        protected override void BuildTargetModel(ModelBuilder modelBuilder)
         {
 #pragma warning disable 612, 618
             modelBuilder.HasAnnotation("ProductVersion", "9.0.0");
@@ -72,7 +75,7 @@ namespace GameLister.Api.Migrations
 
                     b.HasKey("Id");
 
-                    b.ToTable("Games", (string)null);
+                    b.ToTable("Games");
                 });
 
             modelBuilder.Entity("GameLister.Api.Models.GameImage", b =>
@@ -109,7 +112,7 @@ namespace GameLister.Api.Migrations
 
                     b.HasIndex("GameId");
 
-                    b.ToTable("GameImages", (string)null);
+                    b.ToTable("GameImages");
                 });
 
             modelBuilder.Entity("GameLister.Api.Models.ListingDraft", b =>
@@ -170,7 +173,7 @@ namespace GameLister.Api.Migrations
 
                     b.HasIndex("GameId");
 
-                    b.ToTable("ListingDrafts", (string)null);
+                    b.ToTable("ListingDrafts");
                 });
 
             modelBuilder.Entity("GameLister.Api.Models.ListingDraftImage", b =>
@@ -200,7 +203,7 @@ namespace GameLister.Api.Migrations
                     b.HasIndex("ListingDraftId", "GameImageId")
                         .IsUnique();
 
-                    b.ToTable("ListingDraftImages", (string)null);
+                    b.ToTable("ListingDraftImages");
                 });
 
             modelBuilder.Entity("GameLister.Api.Models.Game", b =>
@@ -222,7 +225,7 @@ namespace GameLister.Api.Migrations
 
                             b1.HasKey("GameId");
 
-                            b1.ToTable("Games", (string)null);
+                            b1.ToTable("Games");
 
                             b1.WithOwner()
                                 .HasForeignKey("GameId");
@@ -268,7 +271,7 @@ namespace GameLister.Api.Migrations
 
                             b1.HasKey("ListingDraftId");
 
-                            b1.ToTable("ListingDrafts", (string)null);
+                            b1.ToTable("ListingDrafts");
 
                             b1.WithOwner()
                                 .HasForeignKey("ListingDraftId");

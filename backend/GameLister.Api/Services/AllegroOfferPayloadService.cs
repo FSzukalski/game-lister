@@ -39,8 +39,8 @@ public class AllegroOfferPayloadService : IAllegroOfferPayloadService
         if (preview is null)
             return null;
 
-        // 1) Najpierw bierzemy zdjęcia przypięte do draftu
-        var selected = await _dbContext.ListingDraftImages
+        // 1) Najpierw obrazy przypięte do draftu
+        var selectedDraftImages = await _dbContext.ListingDraftImages
             .AsNoTracking()
             .Where(x => x.ListingDraftId == listingDraftId)
             .Include(x => x.GameImage)
@@ -48,11 +48,17 @@ public class AllegroOfferPayloadService : IAllegroOfferPayloadService
             .Select(x => x.GameImage.Url)
             .ToListAsync(cancellationToken);
 
-        // 2) Jeśli nie ma selekcji w drafcie -> fallback: zdjęcia gry
-        var imageUrls = selected;
+        List<string> imageUrls;
 
-        if (imageUrls.Count == 0)
+        if (selectedDraftImages.Count > 0)
         {
+            imageUrls = selectedDraftImages
+                .Where(u => !string.IsNullOrWhiteSpace(u))
+                .ToList();
+        }
+        else
+        {
+            // 2) Fallback: obrazy gry (primary -> sort)
             imageUrls = await _dbContext.GameImages
                 .AsNoTracking()
                 .Where(i => i.GameId == draft.GameId)
@@ -61,11 +67,11 @@ public class AllegroOfferPayloadService : IAllegroOfferPayloadService
                 .ThenBy(i => i.Id)
                 .Select(i => i.Url)
                 .ToListAsync(cancellationToken);
-        }
 
-        imageUrls = imageUrls
-            .Where(u => !string.IsNullOrWhiteSpace(u))
-            .ToList();
+            imageUrls = imageUrls
+                .Where(u => !string.IsNullOrWhiteSpace(u))
+                .ToList();
+        }
 
         return new AllegroOfferPayloadDto(
             Title: preview.Title,

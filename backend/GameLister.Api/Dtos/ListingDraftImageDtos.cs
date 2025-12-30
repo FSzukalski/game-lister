@@ -8,11 +8,10 @@ public record ListingDraftImageDto(
     bool IsPrimary
 );
 
-public class ListingDraftImageUpsertItemDto
-{
-    public int GameImageId { get; set; }
-    public int SortOrder { get; set; }
-}
+public record ListingDraftImageUpsertItemDto(
+    int GameImageId,
+    int SortOrder
+);
 
 public class ListingDraftImagesUpsertDto
 {

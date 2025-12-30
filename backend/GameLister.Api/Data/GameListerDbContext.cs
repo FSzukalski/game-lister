@@ -104,28 +104,31 @@ public class GameListerDbContext : DbContext
                   .IsRequired();
         });
 
-        // ------- ListingDraftImage (join) -------
+        // ------- ListingDraftImage -------
         modelBuilder.Entity<ListingDraftImage>(entity =>
         {
             entity.HasKey(x => x.Id);
 
-            entity.Property(x => x.SortOrder).HasDefaultValue(0);
-            entity.Property(x => x.CreatedAt).IsRequired();
+            entity.HasIndex(x => new { x.ListingDraftId, x.GameImageId })
+                  .IsUnique();
+
+            entity.Property(x => x.SortOrder)
+                  .HasDefaultValue(0);
+
+            entity.Property(x => x.CreatedAt)
+                  .IsRequired();
 
             entity.HasOne(x => x.ListingDraft)
-                  .WithMany(ld => ld.Images)
+                  .WithMany(d => d.Images)
                   .HasForeignKey(x => x.ListingDraftId)
                   .OnDelete(DeleteBehavior.Cascade);
 
             entity.HasOne(x => x.GameImage)
-                  .WithMany(gi => gi.ListingDraftImages)   // <-- ważne (jeśli dodałeś kolekcję)
+                  .WithMany(i => i.ListingDraftImages)
                   .HasForeignKey(x => x.GameImageId)
-                  .OnDelete(DeleteBehavior.Cascade)
-                  .IsRequired();
-
-            entity.HasIndex(x => new { x.ListingDraftId, x.GameImageId })
-                  .IsUnique();
+                  .OnDelete(DeleteBehavior.Cascade);
         });
+
 
     }
 }
